@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import WaveAnimation from "@/components/WaveAnimation";
 import ScoreCircle from "@/components/ScoreCircle";
 import { getRandomNote, Note, frequencyToNote } from "@/lib/audio/notes";
+import PitchMeter from "@/components/PitchMeter";
 import { playNoteWithTimbre } from "@/lib/audio/synth";
 import { PitchDetector } from "@/lib/audio/pitch-detector";
 import { calculateScore, ScoreResult } from "@/lib/scoring/score";
@@ -191,35 +192,18 @@ export default function SingPage() {
               </p>
 
               <div className="card space-y-4">
-                <div className="flex justify-center gap-8">
-                  <div className="space-y-1 text-center">
-                    <p className="text-xs text-[var(--text-secondary)]">Demandée</p>
-                    <p className="text-3xl font-bold">{targetNote.name}</p>
-                  </div>
-                  {detectedFreq && (
-                    <div className="space-y-1 text-center">
-                      <p className="text-xs text-[var(--text-secondary)]">Chantée</p>
-                      <p className="text-3xl font-bold">{frequencyToNote(detectedFreq).name}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${
-                    scoreResult.score >= 85 ? "bg-green-500" :
-                    scoreResult.score >= 60 ? "bg-yellow-500" : "bg-red-500"
-                  }`} />
-                  <span className="font-medium">{scoreResult.feedback}</span>
-                </div>
-
-                {scoreResult.score >= 65 && scoreResult.direction !== "perfect" && (
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    Justesse : {Math.abs(scoreResult.centsOff)} cents {scoreResult.direction === "sharp" ? "au-dessus" : "en-dessous"}
-                  </p>
+                {detectedFreq ? (
+                  <PitchMeter
+                    centsOff={scoreResult.centsOff}
+                    direction={scoreResult.direction}
+                    targetName={targetNote.name}
+                    detectedName={frequencyToNote(detectedFreq).name}
+                    isCorrectNote={targetNote.midi % 12 === frequencyToNote(detectedFreq).midi % 12}
+                  />
+                ) : (
+                  <p className="text-[var(--text-secondary)]">Aucun son détecté</p>
                 )}
               </div>
-
-              <WaveAnimation isActive={false} />
 
               <div className="flex gap-3 justify-center">
                 <button onClick={nextRound} className="btn-primary">
