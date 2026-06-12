@@ -1,0 +1,18 @@
+{
+  "name": "PerfectPitch",
+  "short_name": "PerfectPitch",
+  "description": "Entraînez votre oreille absolue",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a73e8",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
