@@ -68,10 +68,7 @@ export default function SingPage() {
       setScoreResult(result);
       setPhase("correction");
 
-      // Play correction note in the octave closest to what was sung
-      const octaveDiff = Math.round(Math.log2(avgFreq / targetNote.frequency));
-      const correctionFreq = targetNote.frequency * Math.pow(2, octaveDiff);
-      playNoteWithTimbre(correctionFreq, 3);
+      playNoteWithTimbre(targetNote.frequency, 3);
     } else {
       setDetectedFreq(null);
       setScoreResult({ score: 0, centsOff: 0, direction: "perfect", feedback: "Aucun son détecté" });
