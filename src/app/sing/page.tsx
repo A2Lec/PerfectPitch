@@ -56,13 +56,27 @@ export default function SingPage() {
     }
 
     const frequencies = frequenciesRef.current;
-    if (frequencies.length > 0) {
-      frequencies.sort((a, b) => a - b);
-      const trimmed = frequencies.slice(
-        Math.floor(frequencies.length * 0.1),
-        Math.floor(frequencies.length * 0.9)
-      );
-      const avgFreq = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+    if (frequencies.length > 5) {
+      // Convert to MIDI to filter in pitch space (not frequency space)
+      const midiValues = frequencies.map((f) => 69 + 12 * Math.log2(f / 440));
+      midiValues.sort((a, b) => a - b);
+
+      // Trim outliers (20% each end)
+      const trimStart = Math.floor(midiValues.length * 0.2);
+      const trimEnd = Math.floor(midiValues.length * 0.8);
+      const trimmed = midiValues.slice(trimStart, trimEnd);
+
+      // Take median
+      const medianMidi = trimmed[Math.floor(trimmed.length / 2)];
+
+      // Filter: keep only values within 1 semitone of median
+      const filtered = trimmed.filter((m) => Math.abs(m - medianMidi) < 1);
+      const finalMidi = filtered.length > 0
+        ? filtered.reduce((a, b) => a + b, 0) / filtered.length
+        : medianMidi;
+
+      // Convert back to frequency
+      const avgFreq = 440 * Math.pow(2, (finalMidi - 69) / 12);
       setDetectedFreq(avgFreq);
 
       const result = calculateScore(targetNote, avgFreq);

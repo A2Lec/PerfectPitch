@@ -1,7 +1,7 @@
 let audioContext: AudioContext | null = null;
 
 function getAudioContext(): AudioContext {
-  if (!audioContext) {
+  if (!audioContext || audioContext.state === "closed") {
     audioContext = new AudioContext();
   }
   if (audioContext.state === "suspended") {
@@ -13,22 +13,24 @@ function getAudioContext(): AudioContext {
 export function playNote(frequency: number, duration: number = 1.5): Promise<void> {
   return new Promise((resolve) => {
     const ctx = getAudioContext();
+    const now = ctx.currentTime;
+
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
 
     oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
+    oscillator.frequency.value = frequency;
 
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.05);
-    gainNode.gain.setValueAtTime(0.5, ctx.currentTime + duration - 0.3);
-    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(0.5, now + 0.02);
+    gainNode.gain.setValueAtTime(0.5, now + duration - 0.2);
+    gainNode.gain.linearRampToValueAtTime(0, now + duration);
 
     oscillator.connect(gainNode);
     gainNode.connect(ctx.destination);
 
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + duration);
+    oscillator.start(now);
+    oscillator.stop(now + duration);
 
     oscillator.onended = () => {
       oscillator.disconnect();
@@ -41,50 +43,58 @@ export function playNote(frequency: number, duration: number = 1.5): Promise<voi
 export function playNoteWithTimbre(frequency: number, duration: number = 1.5): Promise<void> {
   return new Promise((resolve) => {
     const ctx = getAudioContext();
+    const now = ctx.currentTime;
+
     const fundamental = ctx.createOscillator();
     const harmonic2 = ctx.createOscillator();
     const harmonic3 = ctx.createOscillator();
-    const gainNode = ctx.createGain();
+
+    const masterGain = ctx.createGain();
+    const gain1 = ctx.createGain();
     const gain2 = ctx.createGain();
     const gain3 = ctx.createGain();
 
     fundamental.type = "sine";
-    fundamental.frequency.setValueAtTime(frequency, ctx.currentTime);
+    fundamental.frequency.value = frequency;
+    gain1.gain.value = 1.0;
 
     harmonic2.type = "sine";
-    harmonic2.frequency.setValueAtTime(frequency * 2, ctx.currentTime);
-    gain2.gain.setValueAtTime(0.15, ctx.currentTime);
+    harmonic2.frequency.value = frequency * 2;
+    gain2.gain.value = 0.12;
 
     harmonic3.type = "sine";
-    harmonic3.frequency.setValueAtTime(frequency * 3, ctx.currentTime);
-    gain3.gain.setValueAtTime(0.07, ctx.currentTime);
+    harmonic3.frequency.value = frequency * 3;
+    gain3.gain.value = 0.05;
 
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.05);
-    gainNode.gain.setValueAtTime(0.4, ctx.currentTime + duration - 0.4);
-    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+    // Envelope
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(0.35, now + 0.03);
+    masterGain.gain.setValueAtTime(0.35, now + duration - 0.3);
+    masterGain.gain.linearRampToValueAtTime(0, now + duration);
 
-    fundamental.connect(gainNode);
+    fundamental.connect(gain1);
     harmonic2.connect(gain2);
-    gain2.connect(gainNode);
     harmonic3.connect(gain3);
-    gain3.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    gain1.connect(masterGain);
+    gain2.connect(masterGain);
+    gain3.connect(masterGain);
+    masterGain.connect(ctx.destination);
 
-    fundamental.start(ctx.currentTime);
-    harmonic2.start(ctx.currentTime);
-    harmonic3.start(ctx.currentTime);
-    fundamental.stop(ctx.currentTime + duration);
-    harmonic2.stop(ctx.currentTime + duration);
-    harmonic3.stop(ctx.currentTime + duration);
+    fundamental.start(now);
+    harmonic2.start(now);
+    harmonic3.start(now);
+    fundamental.stop(now + duration);
+    harmonic2.stop(now + duration);
+    harmonic3.stop(now + duration);
 
     fundamental.onended = () => {
       fundamental.disconnect();
       harmonic2.disconnect();
       harmonic3.disconnect();
-      gainNode.disconnect();
+      gain1.disconnect();
       gain2.disconnect();
       gain3.disconnect();
+      masterGain.disconnect();
       resolve();
     };
   });

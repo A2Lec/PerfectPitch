@@ -53,56 +53,78 @@ export class PitchDetector {
     rms = Math.sqrt(rms / this.buffer.length);
     if (rms < 0.01) return null;
 
-    return this.autocorrelate(this.buffer, this.audioContext!.sampleRate);
+    return this.yinDetect(this.buffer, this.audioContext!.sampleRate);
   }
 
-  private autocorrelate(buffer: Float32Array, sampleRate: number): number | null {
-    const size = buffer.length;
-    const correlations = new Float32Array(size);
+  private yinDetect(buffer: Float32Array, sampleRate: number): number | null {
+    const halfSize = Math.floor(buffer.length / 2);
+    const yinBuffer = new Float32Array(halfSize);
 
-    let foundGoodCorrelation = false;
-    let bestOffset = -1;
-    let bestCorrelation = 0;
-    let lastCorrelation = 1;
+    // Min/max periods: human voice range ~80Hz to ~1000Hz
+    const tauMin = Math.floor(sampleRate / 1000);
+    const tauMax = Math.min(halfSize, Math.floor(sampleRate / 80));
 
-    for (let offset = 0; offset < size; offset++) {
-      let correlation = 0;
-      let norm1 = 0;
-      let norm2 = 0;
+    // Step 1 & 2: Difference function
+    yinBuffer[0] = 1;
+    let runningSum = 0;
 
-      for (let i = 0; i < size - offset; i++) {
-        correlation += buffer[i] * buffer[i + offset];
-        norm1 += buffer[i] * buffer[i];
-        norm2 += buffer[i + offset] * buffer[i + offset];
+    for (let tau = 1; tau < halfSize; tau++) {
+      let diff = 0;
+      for (let i = 0; i < halfSize; i++) {
+        const delta = buffer[i] - buffer[i + tau];
+        diff += delta * delta;
       }
+      yinBuffer[tau] = diff;
 
-      const normalizer = Math.sqrt(norm1 * norm2);
-      correlation = normalizer > 0 ? correlation / normalizer : 0;
-      correlations[offset] = correlation;
+      // Step 3: Cumulative mean normalized difference
+      runningSum += diff;
+      yinBuffer[tau] = runningSum > 0 ? (yinBuffer[tau] * tau) / runningSum : 1;
+    }
 
-      if (offset > sampleRate / 1000) {
-        if (correlation > 0.9 && correlation > lastCorrelation) {
-          foundGoodCorrelation = true;
-          if (correlation > bestCorrelation) {
-            bestCorrelation = correlation;
-            bestOffset = offset;
-          }
-        } else if (foundGoodCorrelation) {
-          break;
+    // Step 4: Absolute threshold (find first dip below threshold)
+    const threshold = 0.15;
+    let tauEstimate = -1;
+
+    for (let tau = tauMin; tau < tauMax; tau++) {
+      if (yinBuffer[tau] < threshold) {
+        // Find local minimum
+        while (tau + 1 < tauMax && yinBuffer[tau + 1] < yinBuffer[tau]) {
+          tau++;
+        }
+        tauEstimate = tau;
+        break;
+      }
+    }
+
+    if (tauEstimate === -1) {
+      // No dip found below threshold, find global minimum in range
+      let minVal = Infinity;
+      for (let tau = tauMin; tau < tauMax; tau++) {
+        if (yinBuffer[tau] < minVal) {
+          minVal = yinBuffer[tau];
+          tauEstimate = tau;
         }
       }
-      lastCorrelation = correlation;
+      // Only accept if reasonably low
+      if (minVal > 0.4) return null;
     }
 
-    if (bestCorrelation > 0.9 && bestOffset > 0) {
-      // Parabolic interpolation for better precision
-      const prev = correlations[bestOffset - 1];
-      const curr = correlations[bestOffset];
-      const next = correlations[bestOffset + 1];
-      const shift = (next - prev) / (2 * (2 * curr - next - prev));
-      return sampleRate / (bestOffset + shift);
+    // Step 5: Parabolic interpolation for sub-sample accuracy
+    if (tauEstimate > 0 && tauEstimate < halfSize - 1) {
+      const s0 = yinBuffer[tauEstimate - 1];
+      const s1 = yinBuffer[tauEstimate];
+      const s2 = yinBuffer[tauEstimate + 1];
+      const adjustment = (s2 - s0) / (2 * (2 * s1 - s2 - s0));
+      if (Math.abs(adjustment) < 1) {
+        tauEstimate += adjustment;
+      }
     }
 
-    return null;
+    const frequency = sampleRate / tauEstimate;
+
+    // Sanity check: human voice range
+    if (frequency < 70 || frequency > 1100) return null;
+
+    return frequency;
   }
 }
