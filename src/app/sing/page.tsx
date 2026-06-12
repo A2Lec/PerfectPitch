@@ -68,7 +68,10 @@ export default function SingPage() {
       setScoreResult(result);
       setPhase("correction");
 
-      playNoteWithTimbre(targetNote.frequency, 3);
+      // Play correction note in the octave closest to what was sung
+      const octaveDiff = Math.round(Math.log2(avgFreq / targetNote.frequency));
+      const correctionFreq = targetNote.frequency * Math.pow(2, octaveDiff);
+      playNoteWithTimbre(correctionFreq, 3);
     } else {
       setDetectedFreq(null);
       setScoreResult({ score: 0, centsOff: 0, direction: "perfect", feedback: "Aucun son détecté" });
@@ -123,14 +126,11 @@ export default function SingPage() {
                 <p className="text-sm text-[var(--text-secondary)] uppercase tracking-wide font-medium">
                   Note à chanter
                 </p>
-                <p className="text-sm text-[var(--text-secondary)]">({targetNote.nameEn})</p>
                 <p className="note-display">{targetNote.name}</p>
-                <p className="text-lg text-[var(--text-secondary)]">
-                  {Math.round(targetNote.frequency)} Hz
-                </p>
+                <p className="text-sm text-[var(--text-secondary)]">({targetNote.nameEn})</p>
               </div>
 
-              <p className="text-sm text-[var(--text-secondary)]">Prêt à chanter ?</p>
+              <p className="text-sm text-[var(--text-secondary)]">Chantez cette note, à n&apos;importe quelle octave</p>
 
               <button onClick={startRecording} className="btn-primary text-lg px-10 py-4">
                 <span className="flex items-center gap-2">
@@ -162,8 +162,8 @@ export default function SingPage() {
                 <p className="text-sm text-[var(--text-secondary)] uppercase tracking-wide font-medium">
                   Chant en cours
                 </p>
-                <p className="text-sm text-[var(--text-secondary)]">({targetNote.nameEn})</p>
                 <p className="note-display">{targetNote.name}</p>
+                <p className="text-sm text-[var(--text-secondary)]">({targetNote.nameEn})</p>
               </div>
 
               <WaveAnimation isActive={true} />
@@ -194,19 +194,18 @@ export default function SingPage() {
               </p>
 
               <div className="card space-y-4">
-                <div className="space-y-1">
-                  <p className="text-xs text-[var(--text-secondary)]">Note cible</p>
-                  <p className="text-2xl font-bold">{targetNote.name}</p>
-                  <p className="text-sm text-[var(--text-secondary)]">{Math.round(targetNote.frequency)} Hz</p>
-                </div>
-
-                {detectedFreq && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-[var(--text-secondary)]">Note détectée</p>
-                    <p className="text-2xl font-bold">{frequencyToNote(detectedFreq).name}</p>
-                    <p className="text-sm text-[var(--text-secondary)]">{Math.round(detectedFreq)} Hz</p>
+                <div className="flex justify-center gap-8">
+                  <div className="space-y-1 text-center">
+                    <p className="text-xs text-[var(--text-secondary)]">Demandée</p>
+                    <p className="text-3xl font-bold">{targetNote.name}</p>
                   </div>
-                )}
+                  {detectedFreq && (
+                    <div className="space-y-1 text-center">
+                      <p className="text-xs text-[var(--text-secondary)]">Chantée</p>
+                      <p className="text-3xl font-bold">{frequencyToNote(detectedFreq).name}</p>
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex items-center justify-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${
@@ -216,9 +215,9 @@ export default function SingPage() {
                   <span className="font-medium">{scoreResult.feedback}</span>
                 </div>
 
-                {scoreResult.direction !== "perfect" && (
+                {scoreResult.score >= 65 && scoreResult.direction !== "perfect" && (
                   <p className="text-sm text-[var(--text-secondary)]">
-                    {Math.abs(scoreResult.centsOff)} cents trop {scoreResult.direction === "sharp" ? "haut" : "bas"}
+                    Justesse : {Math.abs(scoreResult.centsOff)} cents {scoreResult.direction === "sharp" ? "au-dessus" : "en-dessous"}
                   </p>
                 )}
               </div>
